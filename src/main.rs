@@ -1,22 +1,22 @@
 // 1 1 1 1 1 1 1 1
 
 const PRELOADED_SPRITES: [[u8; 5]; 16] = [
-    [0xF0, 0x90, 0x90, 0x90, 0xF0],
-    [0x20, 0x60, 0x20, 0x20, 0x70],
-    [0xF0, 0x10, 0xF0, 0x80, 0xF0],
-    [0xF0, 0x10, 0xF0, 0x10, 0xF0],
-    [0x90, 0x90, 0xF0, 0x10, 0x10],
-    [0xF0, 0x80, 0xF0, 0x10, 0xF0],
-    [0xF0, 0x80, 0xF0, 0x90, 0xF0],
-    [0xF0, 0x10, 0x20, 0x40, 0x40],
-    [0xF0, 0x90, 0xF0, 0x90, 0xF0],
-    [0xF0, 0x90, 0xF0, 0x10, 0xF0],
-    [0xF0, 0x90, 0xF0, 0x90, 0x90],
-    [0xE0, 0x90, 0xE0, 0x90, 0xE0],
-    [0xF0, 0x80, 0x80, 0x80, 0xF0],
-    [0xE0, 0x90, 0x90, 0x90, 0xE0],
-    [0xF0, 0x80, 0xF0, 0x80, 0xF0],
-    [0xF0, 0x80, 0xF0, 0x80, 0x80],
+    [0xF0, 0x90, 0x90, 0x90, 0xF0], // 0
+    [0x20, 0x60, 0x20, 0x20, 0x70], // 1
+    [0xF0, 0x10, 0xF0, 0x80, 0xF0], // 2
+    [0xF0, 0x10, 0xF0, 0x10, 0xF0], // 3
+    [0x90, 0x90, 0xF0, 0x10, 0x10], // 4
+    [0xF0, 0x80, 0xF0, 0x10, 0xF0], // 5
+    [0xF0, 0x80, 0xF0, 0x90, 0xF0], // 6
+    [0xF0, 0x10, 0x20, 0x40, 0x40], // 7
+    [0xF0, 0x90, 0xF0, 0x90, 0xF0], // 8
+    [0xF0, 0x90, 0xF0, 0x10, 0xF0], // 9
+    [0xF0, 0x90, 0xF0, 0x90, 0x90], // A
+    [0xE0, 0x90, 0xE0, 0x90, 0xE0], // B
+    [0xF0, 0x80, 0x80, 0x80, 0xF0], // C
+    [0xE0, 0x90, 0x90, 0x90, 0xE0], // D
+    [0xF0, 0x80, 0xF0, 0x80, 0xF0], // E
+    [0xF0, 0x80, 0xF0, 0x80, 0x80], // F
 ];
 
 fn u8_to_bool_array(number: u8) -> [bool; 8] {
@@ -145,9 +145,9 @@ impl Display {
                 let pixel = self.screen.0[i][j];
 
                 if pixel {
-                    print!("▮");
+                    print!("▮ ");
                 } else {
-                    print!("▯");
+                    print!("▯ ");
                 }
             }
             print!("\n");
@@ -157,10 +157,28 @@ impl Display {
 
 trait Chip8Interpreter {
     // FX29
-    fn store_I_with_sprite_in_VX(&mut self, register_id: usize);
+    fn store_i_with_sprite_in_vx(&mut self, register_id: usize);
 
     // 6xNN
-    fn store_NN_to_VX(&mut self, number: u8, register: u8);
+    fn store_nn_to_vx(&mut self, number: u8, register: u8);
+
+    // 7XNN
+    fn add_nn_to_vx(&mut self, number: u8, register: u8);
+
+    // 8XY0	Store the value of register VY in register VX
+    fn store_vy_to_vx(&mut self, register_x: u8, register_y: u8);
+
+    // 8XY1	Set VX to VX OR VY
+    fn set_vx_to_vx_or_vy(&mut self, register_x: u8, register_y: u8);
+    
+    // 8XY2	Set VX to VX AND VY
+    fn set_vx_to_vx_and_vy(&mut self, register_x: u8, register_y: u8);
+
+    // 8XY3	Set VX to VX XOR VY
+    fn set_vx_to_vx_xor_vy(&mut self, register_x: u8, register_y: u8);
+
+    // 8XY4 vx += vy vf = 1 on carry
+    fn set_vx_to_vx_plus_vy(&mut self, register_x: u8, register_y: u8);
 
     // DXYN
     fn draw(&mut self, bytes: u8, register_x: u8, register_y: u8);
@@ -168,15 +186,73 @@ trait Chip8Interpreter {
 
 impl Chip8Interpreter for Chip_8 {
     // FX29
-    fn store_I_with_sprite_in_VX(&mut self, register_id: usize) {
+    fn store_i_with_sprite_in_vx(&mut self, register_id: usize) {
         let hex_sprite = self.registers[register_id].0;
         let address = (hex_sprite * 5) as u16;
         self.address_register.set(address);
     }
 
-    // 6xNN
-    fn store_NN_to_VX(&mut self, val: u8, register: u8) {
+    // 6XNN
+    fn store_nn_to_vx(&mut self, val: u8, register: u8) {
         self.registers[register as usize].set(val);
+    }
+
+    // 7XNN
+    fn add_nn_to_vx(&mut self, val: u8, register: u8) {
+        let current_value = self.registers[register as usize].0;
+        self.registers[register as usize].set(current_value + val);
+    }
+
+    // 8XY0	Store the value of register VY in register VX
+    fn store_vy_to_vx(&mut self, register_x: u8, register_y: u8) {
+        let y = self.registers[register_y as usize].get();
+        self.registers[register_x as usize].set(y);
+    }
+
+    // 8XY1	Set VX to VX OR VY
+    fn set_vx_to_vx_or_vy(&mut self, register_x: u8, register_y: u8) {
+        let x = self.registers[register_x as usize].get();
+        let y = self.registers[register_y as usize].get();
+        
+        let val = x | y;
+
+        self.registers[register_x as usize].set(val);
+    }
+
+    // 8XY2	Set VX to VX AND VY
+    fn set_vx_to_vx_and_vy(&mut self, register_x: u8, register_y: u8) {
+        let x = self.registers[register_x as usize].get();
+        let y = self.registers[register_y as usize].get();
+        
+        let val = x & y;
+
+        self.registers[register_x as usize].set(val);
+    }
+
+    // 8XY3	Set VX to VX XOR VY
+    fn set_vx_to_vx_xor_vy(&mut self, register_x: u8, register_y: u8) {
+        let x = self.registers[register_x as usize].get();
+        let y = self.registers[register_y as usize].get();
+        
+        let val = x ^ y;
+
+        self.registers[register_x as usize].set(val);
+    }
+
+    // 8XY4 vx += vy vf = 1 on carry
+    fn set_vx_to_vx_plus_vy(&mut self, register_x: u8, register_y: u8) {
+        let x = self.registers[register_x as usize].get();
+        let y = self.registers[register_y as usize].get();
+
+        let sum: u16 = x as u16 + y as u16;
+
+        if sum > 255 {
+            self.registers[0xF].set(1);
+        } else  {
+            self.registers[0xF].set(0);
+        }
+
+        self.registers[register_x as usize].set(sum as u8);
     }
 
     // DXYN
@@ -197,30 +273,30 @@ impl Chip8Interpreter for Chip_8 {
 fn main() {
     let mut chip_8 = Chip_8::new();
 
-    chip_8.store_NN_to_VX(0, 0);
-    chip_8.store_NN_to_VX(0, 1);
-    chip_8.store_NN_to_VX(0xF, 2);
-    chip_8.store_I_with_sprite_in_VX(2);
+    chip_8.store_nn_to_vx(0, 0);
+    chip_8.store_nn_to_vx(0, 1);
+    chip_8.store_nn_to_vx(0xF, 2);
+    chip_8.store_i_with_sprite_in_vx(2);
     chip_8.draw(5, 0, 1);
 
 
-    chip_8.store_NN_to_VX(0, 0);
-    chip_8.store_NN_to_VX(5, 1);
-    chip_8.store_NN_to_VX(0x0, 2);
-    chip_8.store_I_with_sprite_in_VX(2);
+    chip_8.store_nn_to_vx(0, 0);
+    chip_8.store_nn_to_vx(5, 1);
+    chip_8.store_nn_to_vx(0x0, 2);
+    chip_8.store_i_with_sprite_in_vx(2);
     chip_8.draw(5, 0, 1);
 
 
-    chip_8.store_NN_to_VX(0, 0);
-    chip_8.store_NN_to_VX(10, 1);
-    chip_8.store_NN_to_VX(0xD, 2);
-    chip_8.store_I_with_sprite_in_VX(2);
+    chip_8.store_nn_to_vx(0, 0);
+    chip_8.store_nn_to_vx(10, 1);
+    chip_8.store_nn_to_vx(0xD, 2);
+    chip_8.store_i_with_sprite_in_vx(2);
     chip_8.draw(5, 0, 1);
 
-    chip_8.store_NN_to_VX(0, 0);
-    chip_8.store_NN_to_VX(15, 1);
-    chip_8.store_NN_to_VX(0xA, 2);
-    chip_8.store_I_with_sprite_in_VX(2);
+    chip_8.store_nn_to_vx(0, 0);
+    chip_8.store_nn_to_vx(15, 1);
+    chip_8.store_nn_to_vx(0xA, 2);
+    chip_8.store_i_with_sprite_in_vx(2);
     chip_8.draw(5, 0, 1);
 
 
